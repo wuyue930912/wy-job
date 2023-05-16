@@ -6,7 +6,7 @@ plugins {
 }
 
 group("org.wy")
-version("1.1.11")
+version("1.1.10")
 def artifactId = ("wy-job-starter")
 
 repositories {

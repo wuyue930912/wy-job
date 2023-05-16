@@ -8,7 +8,7 @@ import java.lang.annotation.*;
  * @description TODO
  * @date 2022/4/1 11:48
  */
-@Target({ElementType.PARAMETER, ElementType.METHOD})
+@Target({ElementType.METHOD, ElementType.ANNOTATION_TYPE})
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
 public @interface TsJOB {
