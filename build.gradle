@@ -5,13 +5,27 @@ plugins {
     id("org.springframework.boot") version("2.3.12.RELEASE")
 }
 
-group("org.wy")
-version("1.1.11")
-def artifactId = ("wy-job-starter")
+group("com.ts.base")
+version("1.2.66-RELEASE")
+def artifactId = ("ts-base-job-starter")
 
 repositories {
     maven {
         url("https://maven.aliyun.com/repository/public")
+    }
+    maven {
+        credentials {
+            username("605c0d9a3fd856bdf3fb501f")
+            password("IVl]tjij6ZDW")
+        }
+        url("https://packages.aliyun.com/maven/repository/2017546-release-Dczwza/")
+    }
+    maven {
+        credentials {
+            username("605c0d9a3fd856bdf3fb501f")
+            password("IVl]tjij6ZDW")
+        }
+        url("https://packages.aliyun.com/maven/repository/2017546-snapshot-lydKFe/")
     }
 }
 
@@ -50,7 +64,7 @@ java {
 publishing {
     publications {
         library(MavenPublication) {
-            artifactId = ("wy-job-starter")
+            artifactId = ("ts-base-spring-boot-starter")
             from components.java
             artifact sourceJar
         }
@@ -61,12 +75,14 @@ publishing {
         mavenLocal()
         //远程仓库
         maven {
-            name = "wy-job"
-            url = uri("https://maven.pkg.github.com/wuyue930912/wy-job")
             credentials {
-                username = "wuyue930912"
-                password = "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"
+                username("5f1117b64c4e70fdbff0f766")
+                password("ND8y1UHX)gZ0")
             }
+            def releasesRepoUrl = ("https://packages.aliyun.com/maven/repository/2017546-release-Dczwza/")
+            def snapshotsRepoUrl = ("https://packages.aliyun.com/maven/repository/2017546-snapshot-lydKFe/")
+            url = version.endsWith("SNAPSHOT") ? snapshotsRepoUrl :
+                    releasesRepoUrl
         }
     }
 }

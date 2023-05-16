@@ -65,7 +65,7 @@ publishing {
             url = uri("https://maven.pkg.github.com/wuyue930912/wy-job")
             credentials {
                 username = "wuyue930912"
-                password = "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"
+                password = ""
             }
         }
     }
