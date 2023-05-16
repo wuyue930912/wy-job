@@ -1,0 +1,23 @@
+    // 引入TS-JOB依赖
+    implementation("com.ts.base:ts-base-job-starter:1.2.33-RELEASE") {
+        // 版本冲突直接排除对应依赖即可
+        exclude module: "mybatis-plus-boot-starter"
+    }
+
+    // 若不能访问页面, 配置
+    @Configuration
+    public class TsJobMvcConfig extends WebMvcConfigurationSupport {
+
+        @Override
+        public void addResourceHandlers(ResourceHandlerRegistry registry) {
+            registry
+                    .addResourceHandler("/static/**")
+                    .addResourceLocations("classpath:/META-INF/resources/", "classpath:/resources/", "classpath:/templates/");
+
+            super.addResourceHandlers(registry);
+        }
+    }
+
+    // 还不行,配置
+    server:
+        context-path: "/web"

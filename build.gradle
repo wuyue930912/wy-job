@@ -1,0 +1,87 @@
+plugins {
+    id("java")
+    id("maven-publish")
+    id("java-library")
+    id("org.springframework.boot") version("2.3.12.RELEASE")
+}
+
+group("com.ts.base")
+version("1.1.0")
+def artifactId = ("ts-base-job-starter")
+
+repositories {
+    maven {
+        url("https://maven.aliyun.com/repository/public")
+    }
+    maven {
+        credentials {
+            username("605c0d9a3fd856bdf3fb501f")
+            password("IVl]tjij6ZDW")
+        }
+        url("https://packages.aliyun.com/maven/repository/2017546-release-Dczwza/")
+    }
+    maven {
+        credentials {
+            username("605c0d9a3fd856bdf3fb501f")
+            password("IVl]tjij6ZDW")
+        }
+        url("https://packages.aliyun.com/maven/repository/2017546-snapshot-lydKFe/")
+    }
+}
+
+dependencies {
+    implementation("org.springframework.boot:spring-boot-starter-web:2.2.9.RELEASE")
+    implementation("org.springframework.boot:spring-boot-autoconfigure:2.2.9.RELEASE")
+    annotationProcessor("org.springframework.boot:spring-boot-configuration-processor:2.2.9.RELEASE")
+    // MyBatis Plus依赖
+    implementation("com.baomidou:mybatis-plus-boot-starter:3.5.2")
+    implementation("com.baomidou:mybatis-plus-generator:3.5.2")
+    implementation("org.postgresql:postgresql:42.3.8")
+    // lombok依赖
+    annotationProcessor("org.projectlombok:lombok:1.18.2")
+    compileOnly("org.projectlombok:lombok:1.18.2")
+    // quartz依赖
+    implementation("org.quartz-scheduler:quartz:2.3.2")
+    // hutool
+    implementation("cn.hutool:hutool-all:5.8.11")
+    implementation("com.github.oshi:oshi-core:3.9.1")
+}
+
+jar.enabled = true
+// 公共模块不需要运行
+bootJar.enabled = false
+
+task sourceJar(type: Jar) {
+    from sourceSets.main.allJava
+    classifier "sources"
+}
+
+java {
+    sourceCompatibility = "1.8"
+    targetCompatibility = "1.8"
+}
+
+publishing {
+    publications {
+        library(MavenPublication) {
+            artifactId = ("wy-job-starter")
+            from components.java
+            artifact sourceJar
+        }
+    }
+
+    repositories {
+        //本地仓库
+        mavenLocal()
+        //远程仓库
+        maven {
+            name = "wy-job"
+            url = uri("https://maven.pkg.github.com/wuyue930912/wy-job")
+            credentials {
+                username = "wuyue"
+                password = "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"
+            }
+        }
+    }
+}
+
