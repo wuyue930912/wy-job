@@ -64,7 +64,7 @@ publishing {
             name = "wy-job"
             url = uri("https://maven.pkg.github.com/wuyue930912/wy-job")
             credentials {
-                username = "wuyue930912"
+                username = ""
                 password = ""
             }
         }
