@@ -11,6 +11,7 @@ import java.lang.annotation.*;
 @Target({ElementType.METHOD, ElementType.ANNOTATION_TYPE})
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
+@Inherited
 public @interface TsJOB {
     // 调度任务KEY
     String key();
