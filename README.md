@@ -105,9 +105,13 @@ http://{ip}:{port}/ts-job/index.html
 ---------------
 
 ## 5、常见问题
+
 1、依赖冲突直接排除冲突依赖即可
+
 2、如果使用了mybatis-plus必须要3.4.1及以上版本
+
 3、仅支持JDK8及以上版本
+
 4、访问不到页面检查Security配置或者SpringMvcConfig配置
 
 -----------------
