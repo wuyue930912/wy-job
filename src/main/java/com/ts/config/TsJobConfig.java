@@ -48,28 +48,25 @@ public class TsJobConfig {
 
     @PostConstruct
     public void init() throws ClassNotFoundException {
-        if (tsJobYmlProvider.ymlConfig().get("enableBanner").equals(true)) {
-            System.out.println(
-                    "                                                                                                                    \n" +
-                            "                                                                                                                    \n" +
-                            "TTTTTTTTTTTTTTTTTTTTTTT  SSSSSSSSSSSSSSS                            JJJJJJJJJJJ    OOOOOOOOO    BBBBBBBBBBBBBBBBB   \n" +
-                            "T:::::::::::::::::::::TSS:::::::::::::::S                           J:::::::::J  OO:::::::::OO  B::::::::::::::::B  \n" +
-                            "T:::::::::::::::::::::S:::::SSSSSS::::::S                           J:::::::::JOO:::::::::::::OOB::::::BBBBBB:::::B \n" +
-                            "T:::::TT:::::::TT:::::S:::::S     SSSSSSS                           JJ:::::::JO:::::::OOO:::::::BB:::::B     B:::::B\n" +
-                            "TTTTTT  T:::::T  TTTTTS:::::S                                         J:::::J O::::::O   O::::::O B::::B     B:::::B\n" +
-                            "        T:::::T       S:::::S                                         J:::::J O:::::O     O:::::O B::::B     B:::::B\n" +
-                            "        T:::::T        S::::SSSS                                      J:::::J O:::::O     O:::::O B::::BBBBBB:::::B \n" +
-                            "        T:::::T         SS::::::SSSSS     ---------------             J:::::j O:::::O     O:::::O B:::::::::::::BB  \n" +
-                            "        T:::::T           SSS::::::::SS   -:::::::::::::-             J:::::J O:::::O     O:::::O B::::BBBBBB:::::B \n" +
-                            "        T:::::T              SSSSSS::::S  --------------- JJJJJJJ     J:::::J O:::::O     O:::::O B::::B     B:::::B\n" +
-                            "        T:::::T                   S:::::S                 J:::::J     J:::::J O:::::O     O:::::O B::::B     B:::::B\n" +
-                            "        T:::::T                   S:::::S                 J::::::J   J::::::J O::::::O   O::::::O B::::B     B:::::B\n" +
-                            "      TT:::::::TT     SSSSSSS     S:::::S                 J:::::::JJJ:::::::J O:::::::OOO:::::::BB:::::BBBBBB::::::B\n" +
-                            "      T:::::::::T     S::::::SSSSSS:::::S                  JJ:::::::::::::JJ   OO:::::::::::::OOB:::::::::::::::::B \n" +
-                            "      T:::::::::T     S:::::::::::::::SS                     JJ:::::::::JJ       OO:::::::::OO  B::::::::::::::::B  \n" +
-                            "      TTTTTTTTTTT      SSSSSSSSSSSSSSS                         JJJJJJJJJ           OOOOOOOOO    BBBBBBBBBBBBBBBBB   \n" +
-                            "                                                                                                                    \n" +
-                            "                                                                                                         version 1.0.0");
+        if (Boolean.TRUE.equals(tsJobYmlProvider.ymlConfig().get("enableBanner"))) {
+            log.info("\n" +
+                    "TTTTTTTTTTTTTTTTTTTTTTT  SSSSSSSSSSSSSSS                            JJJJJJJJJJJ    OOOOOOOOO    BBBBBBBBBBBBBBBBB   \n" +
+                    "T:::::::::::::::::::::TSS:::::::::::::::S                           J:::::::::J  OO:::::::::OO  B::::::::::::::::B  \n" +
+                    "T:::::::::::::::::::::S:::::SSSSSS::::::S                           J:::::::::JOO:::::::::::::OOB::::::BBBBBB:::::B \n" +
+                    "T:::::TT:::::::TT:::::S:::::S     SSSSSSS                           JJ:::::::JO:::::::OOO:::::::BB:::::B     B:::::B\n" +
+                    "TTTTTT  T:::::T  TTTTTS:::::S                                         J:::::J O::::::O   O::::::O B::::B     B:::::B\n" +
+                    "        T:::::T       S:::::S                                         J:::::J O:::::O     O:::::O B::::B     B:::::B\n" +
+                    "        T:::::T        S::::SSSS                                      J:::::J O:::::O     O:::::O B::::BBBBBB:::::B \n" +
+                    "        T:::::T         SS::::::SSSSS     ---------------             J:::::j O:::::O     O:::::O B:::::::::::::BB  \n" +
+                    "        T:::::T           SSS::::::::SS   -:::::::::::::-             J:::::J O:::::O     O:::::O B::::BBBBBB:::::B \n" +
+                    "        T:::::T              SSSSSS::::S  --------------- JJJJJJJ     J:::::J O:::::O     O:::::O B::::B     B:::::B\n" +
+                    "        T:::::T                   S:::::S                 J:::::J     J:::::J O:::::O     O:::::O B::::B     B:::::B\n" +
+                    "        T:::::T                   S:::::S                 J::::::J   J::::::J O::::::O   O::::::O B::::B     B:::::B\n" +
+                    "      TT:::::::TT     SSSSSSS     S:::::S                 J:::::::JJJ:::::::J O:::::::OOO:::::::BB:::::BBBBBB::::::B\n" +
+                    "      T:::::::::T     S::::::SSSSSS:::::S                  JJ:::::::::::::JJ   OO:::::::::::::OOB:::::::::::::::::B \n" +
+                    "      T:::::::::T     S:::::::::::::::SS                     JJ:::::::::JJ       OO:::::::::OO  B::::::::::::::::B  \n" +
+                    "      TTTTTTTTTTT      SSSSSSSSSSSSSSS                         JJJJJJJJJ           OOOOOOOOO    BBBBBBBBBBBBBBBBB   \n" +
+                    "                                                                                                         version 1.0.0");
         }
 
         // 获取所有使用TsJob注解的方法
