@@ -31,10 +31,10 @@ public class TaskService {
     private final TsJobYmlProvider tsJobYmlProvider;
 
     public void runTaskByQuartzKey(JobKey key) {
-        String jobKey = key.toString().substring(key.toString().indexOf(".") + 1);
+        String jobKey = key.getName();
 //        log.info("[ts-job-TaskService] start run job [{}] at [{}]", jobKey, new Date());
         JobDTO job = TsJobConfig.jobs.get(jobKey);
-        if (tsJobYmlProvider.ymlConfig().get("enableRecord").equals(true)) {
+        if (Boolean.TRUE.equals(tsJobYmlProvider.ymlConfig().get("enableRecord"))) {
             if (Objects.nonNull(job)) {
                 // 记录执行记录，状态执行中
                 TsJobRecordPO po = new TsJobRecordPO();
