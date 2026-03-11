@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>登录 - TS-JOB 调度中心</title>
+    <link rel="stylesheet" href="/ts-job/css/login.css">
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-box">
+            <h1>TS-JOB 调度中心</h1>
+            <form id="loginForm">
+                <div class="input-group">
+                    <input type="text" id="username" name="username" placeholder="用户名" required>
+                </div>
+                <div class="input-group">
+                    <input type="password" id="password" name="password" placeholder="密码" required>
+                </div>
+                <button type="submit">登 录</button>
+                <p class="error" id="errorMsg"></p>
+            </form>
+        </div>
+    </div>
+    <script>
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const errorMsg = document.getElementById('errorMsg');
+            
+            try {
+                const formData = new FormData();
+                formData.append('username', username);
+                formData.append('password', password);
+                
+                const response = await fetch('/ts-job/api/login', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (result.code === 200) {
+                    window.location.href = '/ts-job/index.html';
+                } else {
+                    errorMsg.textContent = result.message;
+                }
+            } catch (err) {
+                errorMsg.textContent = '登录失败，请稍后重试';
+            }
+        });
+    </script>
+</body>
+</html>
