@@ -8,7 +8,10 @@ import com.ts.dto.JobRecordBI;
 import com.ts.mapper.TsJobDAO;
 import com.ts.mapper.TsJobRecordDAO;
 import com.ts.po.TsJobPO;
+import com.ts.po.TsJobRecordPO;
+import com.ts.service.SchedulerHealthService;
 import com.ts.service.TaskService;
+import com.ts.service.TaskSuspendService;
 import com.ts.util.TsJobSpringUtils;
 import com.ts.vo.TsJobPageParamVO;
 import com.ts.vo.TsJobPageResultVO;
@@ -28,11 +31,7 @@ import oshi.hardware.HardwareAbstractionLayer;
 import oshi.util.Util;
 
 import java.lang.reflect.Method;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static com.ts.constant.JobConstant.SCHEDULER_FACTORY;
@@ -55,6 +54,10 @@ public class TsJobApi {
 
     private final TaskService taskService;
 
+    private final TaskSuspendService taskSuspendService;
+
+    private final SchedulerHealthService schedulerHealthService;
+
     /**
      * 根据KEY执行JOB对应的方法
      *
@@ -63,6 +66,12 @@ public class TsJobApi {
      */
     @GetMapping("/run-job")
     public TsJobResponseVO<String> runJob(String jobKey) {
+        // 检查任务是否被暂停
+        if (taskSuspendService.isSuspended(jobKey)) {
+            log.warn("[ts-job] Job [{}] is suspended, cannot run", jobKey);
+            return new TsJobResponseVO<>(400L, "任务已暂停，无法执行");
+        }
+        
         JobDTO job = TsJobConfig.jobs.get(jobKey);
         if (Objects.nonNull(job)) {
             try {
@@ -158,6 +167,56 @@ public class TsJobApi {
     }
 
     /**
+     * 暂停任务（运行时暂停，不删除调度）
+     */
+    @GetMapping("/suspend-job")
+    public TsJobResponseVO<String> suspendJob(String jobKey) {
+        try {
+            boolean result = taskSuspendService.suspendJob(jobKey);
+            if (result) {
+                return new TsJobResponseVO<>(200L, "任务已暂停");
+            } else {
+                return new TsJobResponseVO<>(400L, "任务不存在");
+            }
+        } catch (Exception e) {
+            log.error("[ts-job-TsJobApi] suspend job error: {}", e.getMessage(), e);
+            return new TsJobResponseVO<>(500L, "暂停失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 恢复任务
+     */
+    @GetMapping("/resume-job")
+    public TsJobResponseVO<String> resumeJob(String jobKey) {
+        try {
+            boolean result = taskSuspendService.resumeJob(jobKey);
+            if (result) {
+                return new TsJobResponseVO<>(200L, "任务已恢复");
+            } else {
+                return new TsJobResponseVO<>(400L, "任务不存在");
+            }
+        } catch (Exception e) {
+            log.error("[ts-job-TsJobApi] resume job error: {}", e.getMessage(), e);
+            return new TsJobResponseVO<>(500L, "恢复失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 获取暂停的任务列表
+     */
+    @GetMapping("/get-suspended-jobs")
+    public TsJobResponseVO<List<String>> getSuspendedJobs() {
+        try {
+            List<String> suspendedJobs = taskSuspendService.getSuspendedJobs();
+            return new TsJobResponseVO<>(200L, "处理成功", suspendedJobs);
+        } catch (Exception e) {
+            log.error("[ts-job-TsJobApi] get suspended jobs error: {}", e.getMessage(), e);
+            return new TsJobResponseVO<>(500L, "处理失败: " + e.getMessage());
+        }
+    }
+
+    /**
      * 创建调度任务
      *
      * @author yue.wu
@@ -201,6 +260,10 @@ public class TsJobApi {
             return new TsJobResponseVO<>(400L, "JOB不存在");
         }
         String jobKey = po.getJobKey();
+        
+        // 清除暂停状态
+        taskSuspendService.resumeJob(jobKey);
+        
         JobDTO job = TsJobConfig.jobs.get(jobKey);
         if (Objects.nonNull(job)) {
             try {
@@ -246,6 +309,8 @@ public class TsJobApi {
                     tsJobVO.setTotalCount(stats.getTotalExecutions());
                     tsJobVO.setSuccessRate(stats.getSuccessRate());
                 }
+                // 添加暂停状态
+                tsJobVO.setSuspended(taskSuspendService.isSuspended(po.getJobKey()));
                 result.add(tsJobVO);
             }
 
@@ -303,7 +368,7 @@ public class TsJobApi {
             int result = Math.max((int) (100d * user / (double) totalCpu) + (int) (100d * cSys / (double) totalCpu), 0);
             return new TsJobResponseVO<>(200L, "处理成功", result);
         } catch (Exception e) {
-            log.error("[ts-job-TsJobApi] get cpu error: {}", e.getMessage());
+            log.error("[ts-job-TsJobApi] get cpu error: {}", e.getMessage(), e);
             return new TsJobResponseVO<>(500L, "处理失败: " + e.getMessage());
         }
     }
@@ -394,6 +459,50 @@ public class TsJobApi {
             return new TsJobResponseVO<>(200L, "处理成功");
         } catch (Exception e) {
             log.error("[ts-job-TsJobApi] clear stats error: {}", e.getMessage(), e);
+            return new TsJobResponseVO<>(500L, "处理失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 获取调度健康状态
+     */
+    @GetMapping("/health")
+    public TsJobResponseVO<Map<String, Object>> getHealth() {
+        try {
+            Map<String, Object> health = schedulerHealthService.getHealthStatus();
+            return new TsJobResponseVO<>(200L, "处理成功", health);
+        } catch (Exception e) {
+            log.error("[ts-job-TsJobApi] get health error: {}", e.getMessage(), e);
+            return new TsJobResponseVO<>(500L, "处理失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 获取调度摘要信息
+     */
+    @GetMapping("/summary")
+    public TsJobResponseVO<Map<String, Object>> getSummary() {
+        try {
+            Map<String, Object> summary = schedulerHealthService.getSchedulerSummary();
+            return new TsJobResponseVO<>(200L, "处理成功", summary);
+        } catch (Exception e) {
+            log.error("[ts-job-TsJobApi] get summary error: {}", e.getMessage(), e);
+            return new TsJobResponseVO<>(500L, "处理失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 获取任务的执行历史记录
+     */
+    @GetMapping("/get-job-records")
+    public TsJobResponseVO<List<TsJobRecordPO>> getJobRecords(
+            @RequestParam String jobKey,
+            @RequestParam(required = false, defaultValue = "10") int limit) {
+        try {
+            List<TsJobRecordPO> records = tsJobRecordDAO.selectByJobKey(jobKey, limit);
+            return new TsJobResponseVO<>(200L, "处理成功", records);
+        } catch (Exception e) {
+            log.error("[ts-job-TsJobApi] get job records error: {}", e.getMessage(), e);
             return new TsJobResponseVO<>(500L, "处理失败: " + e.getMessage());
         }
     }

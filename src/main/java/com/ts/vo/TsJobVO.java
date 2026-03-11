@@ -42,4 +42,9 @@ public class TsJobVO {
      * 最后执行时间
      */
     private Timestamp lastExecuteTime;
+    
+    /**
+     * 暂停状态
+     */
+    private Boolean suspended;
 }

@@ -23,6 +23,15 @@ public interface TsJobRecordDAO extends BaseMapper<TsJobRecordPO> {
     TsJobRecordPO selectLastByJobKey(String jobKey);
 
     /**
+     * 查询任务执行历史记录
+     * @param jobKey 任务key
+     * @param limit 返回记录数
+     * @return 执行记录列表
+     */
+    @Select("SELECT * FROM ts_job_record WHERE job_key = #{jobKey} ORDER BY record_time DESC LIMIT #{limit}")
+    List<TsJobRecordPO> selectByJobKey(String jobKey, int limit);
+
+    /**
      * 查询任务执行统计信息
      * @param jobKey 任务key
      * @return 统计信息

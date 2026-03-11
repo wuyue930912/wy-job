@@ -218,6 +218,20 @@ public void execute() {
 
 ## 更新记录
 
+### 2026-03-11 (第二版)
+- 新增任务暂停/恢复功能（TaskSuspendService）
+  - `GET /ts-job/suspend-job?jobKey=xxx` - 暂停任务
+  - `GET /ts-job/resume-job?jobKey=xxx` - 恢复任务
+  - `GET /ts-job/get-suspended-jobs` - 获取暂停任务列表
+- 新增调度健康检查服务（SchedulerHealthService）
+  - `GET /ts-job/health` - 获取调度健康状态
+  - `GET /ts-job/summary` - 获取调度摘要信息
+- 新增任务执行历史查询API
+  - `GET /ts-job/get-job-records?jobKey=xxx&limit=10` - 获取任务执行历史
+- 优化任务执行检查：暂停的任务不会被调度执行
+- 任务删除时自动清除暂停状态
+- 完善日志输出和异常处理
+
 ### 2026-03-11
 - 新增任务并发控制功能（maxConcurrent参数）
 - 新增任务依赖功能（dependencies参数）
