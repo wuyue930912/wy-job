@@ -8,6 +8,7 @@ import com.ts.dto.JobRecordBI;
 import com.ts.mapper.TsJobDAO;
 import com.ts.mapper.TsJobRecordDAO;
 import com.ts.po.TsJobPO;
+import com.ts.service.TaskService;
 import com.ts.util.TsJobSpringUtils;
 import com.ts.vo.TsJobPageParamVO;
 import com.ts.vo.TsJobPageResultVO;
@@ -30,7 +31,9 @@ import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 import static com.ts.constant.JobConstant.SCHEDULER_FACTORY;
 import static com.ts.constant.JobConstant.TRIGGER_GROUP_NAME;
@@ -50,6 +53,8 @@ public class TsJobApi {
 
     private final TsJobRecordDAO tsJobRecordDAO;
 
+    private final TaskService taskService;
+
     /**
      * 根据KEY执行JOB对应的方法
      *
@@ -68,7 +73,8 @@ public class TsJobApi {
                 ReflectionUtils.invokeMethod(method, service);
                 return new TsJobResponseVO<>(200L, "执行成功");
             } catch (Exception e) {
-                return new TsJobResponseVO<>(500L, "执行失败" + e.getMessage());
+                log.error("[ts-job-TsJobApi] run job error: {}", e.getMessage(), e);
+                return new TsJobResponseVO<>(500L, "执行失败: " + e.getMessage());
             }
         }
         return new TsJobResponseVO<>(500L, "调度未注册");
@@ -106,10 +112,11 @@ public class TsJobApi {
                 if (!scheduler.isShutdown()) {
                     scheduler.start();
                 }
+                log.info("[ts-job-TsJobApi] started scheduler for job: {}", jobKey);
                 return new TsJobResponseVO<>(200L, "处理成功");
             } catch (SchedulerException e) {
-                log.error("[ts-job-TsJobConfig] Quartz = error : {}", e.getMessage());
-                return new TsJobResponseVO<>(500L, "处理失败" + e.getMessage());
+                log.error("[ts-job-TsJobApi] start scheduler error: {}", e.getMessage(), e);
+                return new TsJobResponseVO<>(500L, "处理失败: " + e.getMessage());
 
             }
         }
@@ -139,11 +146,12 @@ public class TsJobApi {
                 scheduler.pauseTrigger(triggerKey);
                 scheduler.unscheduleJob(triggerKey);
                 scheduler.deleteJob(JobKey.jobKey(jobKey, TRIGGER_GROUP_NAME));
+                log.info("[ts-job-TsJobApi] stopped scheduler for job: {}", jobKey);
                 return new TsJobResponseVO<>(200L, "处理成功");
 
             } catch (SchedulerException e) {
-                log.error("[ts-job-TsJobApi] stop job fail because {}", e.getMessage());
-                return new TsJobResponseVO<>(500L, "处理失败" + e.getMessage());
+                log.error("[ts-job-TsJobApi] stop job fail because {}", e.getMessage(), e);
+                return new TsJobResponseVO<>(500L, "处理失败: " + e.getMessage());
             }
         }
         return new TsJobResponseVO<>(500L, "调度任务未注册");
@@ -161,10 +169,11 @@ public class TsJobApi {
         po.setVersion(1);
         try {
             tsJobDAO.insert(po);
+            return new TsJobResponseVO<>(200L, "处理成功");
         } catch (Exception e) {
-            return new TsJobResponseVO<>(500L, "新增失败" + e.getMessage());
+            log.error("[ts-job-TsJobApi] add job error: {}", e.getMessage(), e);
+            return new TsJobResponseVO<>(500L, "新增失败: " + e.getMessage());
         }
-        return new TsJobResponseVO<>(200L, "处理成功");
     }
 
     @PostMapping("/edit-job")
@@ -173,7 +182,8 @@ public class TsJobApi {
         try {
             tsJobDAO.updateById(po);
         } catch (Exception e) {
-            return new TsJobResponseVO<>(500L, "修改失败" + e.getMessage());
+            log.error("[ts-job-TsJobApi] edit job error: {}", e.getMessage(), e);
+            return new TsJobResponseVO<>(500L, "修改失败: " + e.getMessage());
         }
 
         stopJob(po.getJobKey());
@@ -201,8 +211,8 @@ public class TsJobApi {
                 scheduler.deleteJob(JobKey.jobKey(jobKey, TRIGGER_GROUP_NAME));
                 return new TsJobResponseVO<>(200L, "处理成功");
             } catch (SchedulerException e) {
-                log.error("[ts-job-TsJobApi] stop job fail because {}", e.getMessage());
-                return new TsJobResponseVO<>(500L, "处理失败" + e.getMessage());
+                log.error("[ts-job-TsJobApi] stop job fail because {}", e.getMessage(), e);
+                return new TsJobResponseVO<>(500L, "处理失败: " + e.getMessage());
             }
         }
         tsJobDAO.deleteById(id);
@@ -213,77 +223,178 @@ public class TsJobApi {
     @PostMapping("/search-job")
     public TsJobResponseVO<TsJobPageResultVO<List<TsJobVO>>> searchJob(@RequestBody TsJobPageParamVO<String> vo) {
         log.info("[ts-job-TsJobApi] start search job time {} ", new Date());
-        List<TsJobPO> list = tsJobDAO.selectByPage((vo.getPageIndex() - 1) * vo.getPageSize(),
-                vo.getPageSize());
-        Long count = tsJobDAO.selectCountByPage();
-        Long totalPage = (count + vo.getPageSize() - 1) / vo.getPageSize();
+        try {
+            List<TsJobPO> list = tsJobDAO.selectByPage((vo.getPageIndex() - 1) * vo.getPageSize(),
+                    vo.getPageSize());
+            Long count = tsJobDAO.selectCountByPage();
+            Long totalPage = (count + vo.getPageSize() - 1) / vo.getPageSize();
 
-        List<TsJobVO> result = new ArrayList<>();
-        list.forEach(po -> {
-            TsJobVO tsJobVO = new TsJobVO();
-            BeanUtil.copyProperties(po, tsJobVO);
-            if (po.getVersion().equals(1)) {
-                // stop
-                tsJobVO.setVersion("关闭");
-            } else if (po.getVersion().equals(0)) {
-                // start
-                tsJobVO.setVersion("开启");
-            } else if (po.getVersion().equals(3)) {
-                // not start
-                tsJobVO.setVersion("未开始");
+            List<TsJobVO> result = new ArrayList<>();
+            for (TsJobPO po : list) {
+                TsJobVO tsJobVO = new TsJobVO();
+                BeanUtil.copyProperties(po, tsJobVO);
+                if (po.getVersion().equals(1)) {
+                    tsJobVO.setVersion("关闭");
+                } else if (po.getVersion().equals(0)) {
+                    tsJobVO.setVersion("开启");
+                } else if (po.getVersion().equals(3)) {
+                    tsJobVO.setVersion("未开始");
+                }
+                // 添加任务运行统计
+                TaskService.JobExecutionStats stats = taskService.getJobStats(po.getJobKey());
+                if (stats != null) {
+                    tsJobVO.setTotalCount(stats.getTotalExecutions());
+                    tsJobVO.setSuccessRate(stats.getSuccessRate());
+                }
+                result.add(tsJobVO);
             }
-            result.add(tsJobVO);
-        });
 
-        TsJobPageResultVO<List<TsJobVO>> data = TsJobPageResultVO.<List<TsJobVO>>builder()
-                .result(result)
-                .total(totalPage)
-                .build();
-        return new TsJobResponseVO<>(200L, "处理成功", data);
+            TsJobPageResultVO<List<TsJobVO>> data = TsJobPageResultVO.<List<TsJobVO>>builder()
+                    .result(result)
+                    .total(totalPage)
+                    .build();
+            return new TsJobResponseVO<>(200L, "处理成功", data);
+        } catch (Exception e) {
+            log.error("[ts-job-TsJobApi] search job error: {}", e.getMessage(), e);
+            return new TsJobResponseVO<>(500L, "查询失败: " + e.getMessage());
+        }
     }
 
+    /**
+     * 获取系统内存使用率
+     */
     @GetMapping("/get-mem")
     public TsJobResponseVO<Integer> getMem() {
-        SystemInfo si = new SystemInfo();
-        HardwareAbstractionLayer hal = si.getHardware();
-        GlobalMemory memory = hal.getMemory();
-        long used = memory.getTotal() - memory.getAvailable();
-        int result = (int) (((double) used / (double) memory.getTotal()) * 100);
-        return new TsJobResponseVO<>(200L, "处理成功", result);
+        try {
+            SystemInfo si = new SystemInfo();
+            HardwareAbstractionLayer hal = si.getHardware();
+            GlobalMemory memory = hal.getMemory();
+            long used = memory.getTotal() - memory.getAvailable();
+            int result = (int) (((double) used / (double) memory.getTotal()) * 100);
+            return new TsJobResponseVO<>(200L, "处理成功", result);
+        } catch (Exception e) {
+            log.error("[ts-job-TsJobApi] get mem error: {}", e.getMessage());
+            return new TsJobResponseVO<>(500L, "处理失败: " + e.getMessage());
+        }
     }
 
+    /**
+     * 获取系统CPU使用率
+     */
     @GetMapping("/get-cpu")
     public TsJobResponseVO<Integer> getCpu() {
-        SystemInfo si = new SystemInfo();
-        HardwareAbstractionLayer hal = si.getHardware();
-        CentralProcessor processor = hal.getProcessor();
-        long[] prevTicks = processor.getSystemCpuLoadTicks();
-        Util.sleep(500);
+        try {
+            SystemInfo si = new SystemInfo();
+            HardwareAbstractionLayer hal = si.getHardware();
+            CentralProcessor processor = hal.getProcessor();
+            long[] prevTicks = processor.getSystemCpuLoadTicks();
+            Util.sleep(500);
 
-        long[] ticks = processor.getSystemCpuLoadTicks();
-        long nice = ticks[TickType.NICE.getIndex()] - prevTicks[TickType.NICE.getIndex()];
-        long irq = ticks[TickType.IRQ.getIndex()] - prevTicks[TickType.IRQ.getIndex()];
-        long softIrq = ticks[TickType.SOFTIRQ.getIndex()] - prevTicks[TickType.SOFTIRQ.getIndex()];
-        long steal = ticks[TickType.STEAL.getIndex()] - prevTicks[TickType.STEAL.getIndex()];
-        long cSys = ticks[TickType.SYSTEM.getIndex()] - prevTicks[TickType.SYSTEM.getIndex()];
-        long user = ticks[TickType.USER.getIndex()] - prevTicks[TickType.USER.getIndex()];
-        long ioWait = ticks[TickType.IOWAIT.getIndex()] - prevTicks[TickType.IOWAIT.getIndex()];
-        long idle = ticks[TickType.IDLE.getIndex()] - prevTicks[TickType.IDLE.getIndex()];
-        long totalCpu = Math.max(user + nice + cSys + idle + ioWait + irq + softIrq + steal, 0);
-        int result = Math.max((int) (100d * user / (double) totalCpu) + (int) (100d * cSys / (double) totalCpu), 0);
-        return new TsJobResponseVO<>(200L, "处理成功", result);
+            long[] ticks = processor.getSystemCpuLoadTicks();
+            long nice = ticks[TickType.NICE.getIndex()] - prevTicks[TickType.NICE.getIndex()];
+            long irq = ticks[TickType.IRQ.getIndex()] - prevTicks[TickType.IRQ.getIndex()];
+            long softIrq = ticks[TickType.SOFTIRQ.getIndex()] - prevTicks[TickType.SOFTIRQ.getIndex()];
+            long steal = ticks[TickType.STEAL.getIndex()] - prevTicks[TickType.STEAL.getIndex()];
+            long cSys = ticks[TickType.SYSTEM.getIndex()] - prevTicks[TickType.SYSTEM.getIndex()];
+            long user = ticks[TickType.USER.getIndex()] - prevTicks[TickType.USER.getIndex()];
+            long ioWait = ticks[TickType.IOWAIT.getIndex()] - prevTicks[TickType.IOWAIT.getIndex()];
+            long idle = ticks[TickType.IDLE.getIndex()] - prevTicks[TickType.IDLE.getIndex()];
+            long totalCpu = Math.max(user + nice + cSys + idle + ioWait + irq + softIrq + steal, 0);
+            int result = Math.max((int) (100d * user / (double) totalCpu) + (int) (100d * cSys / (double) totalCpu), 0);
+            return new TsJobResponseVO<>(200L, "处理成功", result);
+        } catch (Exception e) {
+            log.error("[ts-job-TsJobApi] get cpu error: {}", e.getMessage());
+            return new TsJobResponseVO<>(500L, "处理失败: " + e.getMessage());
+        }
     }
 
+    /**
+     * 获取执行统计BI数据
+     */
     @GetMapping("/get-record-bi")
     public TsJobResponseVO<List<JobRecordBI>> getRecordBI() {
-        List<JobRecordBI> result = new ArrayList<>();
-        tsJobRecordDAO.selectRecordBI().forEach(po -> {
-            JobRecordBI dto = new JobRecordBI();
-            dto.setValue(po.getValue());
-            dto.setName(po.getName().equals("1") ? "成功" : (po.getName().equals("2") ? "失败" : "未执行"));
-            result.add(dto);
-        });
+        try {
+            List<JobRecordBI> result = new ArrayList<>();
+            tsJobRecordDAO.selectRecordBI().forEach(po -> {
+                JobRecordBI dto = new JobRecordBI();
+                dto.setValue(po.getValue());
+                dto.setName(po.getName().equals("1") ? "成功" : (po.getName().equals("2") ? "失败" : "未执行"));
+                result.add(dto);
+            });
+            return new TsJobResponseVO<>(200L, "处理成功", result);
+        } catch (Exception e) {
+            log.error("[ts-job-TsJobApi] get record bi error: {}", e.getMessage(), e);
+            return new TsJobResponseVO<>(500L, "处理失败: " + e.getMessage());
+        }
+    }
 
-        return new TsJobResponseVO<>(200L, "处理成功", result);
+    /**
+     * 获取所有任务的执行统计
+     */
+    @GetMapping("/get-all-stats")
+    public TsJobResponseVO<Map<String, TaskService.JobExecutionStats>> getAllStats() {
+        try {
+            Map<String, TaskService.JobExecutionStats> stats = taskService.getAllJobStats();
+            return new TsJobResponseVO<>(200L, "处理成功", stats);
+        } catch (Exception e) {
+            log.error("[ts-job-TsJobApi] get all stats error: {}", e.getMessage(), e);
+            return new TsJobResponseVO<>(500L, "处理失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 获取指定任务的执行统计
+     */
+    @GetMapping("/get-job-stats")
+    public TsJobResponseVO<TaskService.JobExecutionStats> getJobStats(String jobKey) {
+        try {
+            TaskService.JobExecutionStats stats = taskService.getJobStats(jobKey);
+            return new TsJobResponseVO<>(200L, "处理成功", stats);
+        } catch (Exception e) {
+            log.error("[ts-job-TsJobApi] get job stats error: {}", e.getMessage(), e);
+            return new TsJobResponseVO<>(500L, "处理失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 获取正在运行的任务列表
+     */
+    @GetMapping("/get-running-jobs")
+    public TsJobResponseVO<List<TaskService.RunningJob>> getRunningJobs() {
+        try {
+            List<TaskService.RunningJob> runningJobs = taskService.getRunningJobs();
+            return new TsJobResponseVO<>(200L, "处理成功", runningJobs);
+        } catch (Exception e) {
+            log.error("[ts-job-TsJobApi] get running jobs error: {}", e.getMessage(), e);
+            return new TsJobResponseVO<>(500L, "处理失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 获取所有已注册的任务列表
+     */
+    @GetMapping("/get-registered-jobs")
+    public TsJobResponseVO<List<JobDTO>> getRegisteredJobs() {
+        try {
+            List<JobDTO> jobs = new ArrayList<>(TsJobConfig.jobs.values());
+            return new TsJobResponseVO<>(200L, "处理成功", jobs);
+        } catch (Exception e) {
+            log.error("[ts-job-TsJobApi] get registered jobs error: {}", e.getMessage(), e);
+            return new TsJobResponseVO<>(500L, "处理失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 清除任务执行统计
+     */
+    @PostMapping("/clear-stats")
+    public TsJobResponseVO<String> clearStats(@RequestParam String jobKey) {
+        try {
+            taskService.clearJobStats(jobKey);
+            return new TsJobResponseVO<>(200L, "处理成功");
+        } catch (Exception e) {
+            log.error("[ts-job-TsJobApi] clear stats error: {}", e.getMessage(), e);
+            return new TsJobResponseVO<>(500L, "处理失败: " + e.getMessage());
+        }
     }
 }

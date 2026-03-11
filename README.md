@@ -10,7 +10,7 @@
 <dependency>
   <groupId>org.wy</groupId>
   <artifactId>ts-base-job-starter</artifactId>
-  <version>1.1.11</version>
+  <version>1.1.12</version>
 </dependency>
 ```
 
@@ -153,3 +153,82 @@ ts-job:
   login:
     enabled: false
 ```
+
+-----------------
+
+## 8、新功能说明 (v1.1.12+)
+
+### 8.1 任务并发控制
+
+支持配置任务的最大并发数，避免同一任务同时执行：
+
+```java
+@TsJOB(
+    key = "myJob",
+    description = "我的任务",
+    maxConcurrent = 1  // 最多同时运行1个实例
+)
+public void execute() {
+    // 任务逻辑
+}
+```
+
+### 8.2 任务依赖
+
+支持配置任务依赖，确保依赖任务执行成功后再执行当前任务：
+
+```java
+@TsJOB(
+    key = "dependencyJob",
+    description = "依赖任务",
+    dependencies = {"parentJob1", "parentJob2"},  // 依赖的任务key
+    dependencyCheckSuccess = true  // 是否检查依赖任务执行成功
+)
+public void execute() {
+    // 任务逻辑
+}
+```
+
+### 8.3 慢任务告警
+
+支持配置慢任务阈值，超过阈值自动告警：
+
+```java
+@TsJOB(
+    key = "slowJob",
+    description = "慢任务",
+    slowThreshold = 30  // 超过30秒视为慢任务，触发告警
+)
+public void execute() {
+    // 任务逻辑
+}
+```
+
+### 8.4 执行统计API
+
+新增以下API用于获取执行统计：
+
+- `GET /ts-job/get-all-stats` - 获取所有任务的执行统计
+- `GET /ts-job/get-job-stats?jobKey=xxx` - 获取指定任务的执行统计
+- `GET /ts-job/get-running-jobs` - 获取正在运行的任务列表
+- `GET /ts-job/get-registered-jobs` - 获取所有已注册的任务列表
+- `POST /ts-job/clear-stats?jobKey=xxx` - 清除任务统计
+
+-----------------
+
+## 更新记录
+
+### 2026-03-11
+- 新增任务并发控制功能（maxConcurrent参数）
+- 新增任务依赖功能（dependencies参数）
+- 新增任务慢查询告警功能（slowThreshold参数）
+- 新增任务执行统计功能，包含成功率、平均耗时等
+- 新增任务告警服务接口（JobAlertService）和默认实现
+- 修复TaskService中重复代码的编译错误
+- 完善异常处理和日志记录
+- 新增多个API端点用于查询执行统计和运行状态
+- 优化任务执行流程，添加完整的try-catch保护
+
+### 2026-01-01
+- 新增登录认证功能
+- 优化页面UI
