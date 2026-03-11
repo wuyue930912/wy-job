@@ -116,3 +116,40 @@ http://{ip}:{port}/ts-job/index.html
 
 -----------------
 ## 6、若发现其他问题可以在这里反馈，万分感谢！
+
+-----------------
+
+## 7、配置说明
+
+### 基础配置 (application.yml)
+
+```yaml
+ts-job:
+  # 是否显示启动Banner
+  enable-banner: true
+  # 是否开启执行记录
+  enable-record: true
+  # 登录配置
+  login:
+    # 是否启用登录验证 (默认启用)
+    enabled: true
+    # 用户名 (默认 admin)
+    username: admin
+    # 密码 (默认 admin123)
+    password: admin123
+```
+
+### 登录功能
+
+从 v1.2.67 开始，系统默认启用登录验证。首次登录：
+- 用户名：`admin`
+- 密码：`admin123`
+
+建议首次登录后修改密码。
+
+如需禁用登录：
+```yaml
+ts-job:
+  login:
+    enabled: false
+```
