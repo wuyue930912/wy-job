@@ -8,6 +8,10 @@ public class JobDTO {
     private Class aClass;
     private String className;
     private Method aMethod;
+    private String description;
+    private int retryCount;
+    private int timeout;
+    private long retryInterval;
 
     public String getKey() {
         return key;
@@ -41,12 +45,48 @@ public class JobDTO {
         this.className = className;
     }
 
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
+    }
+
+    public int getRetryCount() {
+        return retryCount;
+    }
+
+    public void setRetryCount(int retryCount) {
+        this.retryCount = retryCount;
+    }
+
+    public int getTimeout() {
+        return timeout;
+    }
+
+    public void setTimeout(int timeout) {
+        this.timeout = timeout;
+    }
+
+    public long getRetryInterval() {
+        return retryInterval;
+    }
+
+    public void setRetryInterval(long retryInterval) {
+        this.retryInterval = retryInterval;
+    }
+
     @Override
     public String toString() {
         return "JobDTO{" +
                 "key='" + key + '\'' +
                 ", aClass=" + aClass +
                 ", aMethod=" + aMethod +
+                ", description='" + description + '\'' +
+                ", retryCount=" + retryCount +
+                ", timeout=" + timeout +
+                ", retryInterval=" + retryInterval +
                 '}';
     }
 }
