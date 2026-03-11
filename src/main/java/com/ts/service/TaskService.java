@@ -252,6 +252,7 @@ public class TaskService {
         }
 
         String lastError = null;
+        long startTime = System.currentTimeMillis();
         
         for (int attempt = 0; attempt <= maxRetries; attempt++) {
             if (attempt > 0) {
@@ -262,72 +263,162 @@ public class TaskService {
                     Thread.sleep(retryInterval);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
+                    log.error("[ts-job] Job [{}] interrupted during retry, attempt {}", job.getKey(), attempt);
                     return ExecuteResult.failure("Interrupted during retry");
                 }
             }
 
+            // 记录每次尝试开始
+            long attemptStartTime = System.currentTimeMillis();
+            
             // 执行任务
-            boolean success;
-            if (timeoutSeconds > 0) {
-                success = executeWithTimeout(job, timeoutSeconds);
-            } else {
-                success = executeJob(job);
+            ExecuteResult result;
+            try {
+                if (timeoutSeconds > 0) {
+                    result = executeWithTimeoutDetailed(job, timeoutSeconds);
+                } else {
+                    result = executeJobDetailed(job);
+                }
+            } catch (Exception e) {
+                log.error("[ts-job] Job [{}] execution exception on attempt {}: {}", 
+                        job.getKey(), attempt + 1, e.getMessage(), e);
+                result = ExecuteResult.failure("Exception: " + e.getMessage());
             }
             
-            if (success) {
-                log.info("[ts-job] Job [{}] succeeded on attempt {}", job.getKey(), attempt + 1);
+            long attemptDuration = System.currentTimeMillis() - attemptStartTime;
+            
+            if (result.isSuccess()) {
+                long totalDuration = System.currentTimeMillis() - startTime;
+                log.info("[ts-job] Job [{}] succeeded on attempt {}, total duration: {}ms", 
+                        job.getKey(), attempt + 1, totalDuration);
+                
+                // 成功后检查是否触发慢任务告警
+                checkSlowAlert(job, totalDuration);
+                
                 return ExecuteResult.success();
             }
             
-            lastError = "Execution failed on attempt " + (attempt + 1);
+            lastError = result.getErrorMessage();
+            log.warn("[ts-job] Job [{}] failed on attempt {}: {}, duration: {}ms", 
+                    job.getKey(), attempt + 1, lastError, attemptDuration);
         }
         
-        log.error("[ts-job] Job [{}] failed after {} attempts", job.getKey(), maxRetries + 1);
+        long totalDuration = System.currentTimeMillis() - startTime;
+        log.error("[ts-job] Job [{}] failed after {} attempts, total duration: {}ms, last error: {}", 
+                job.getKey(), maxRetries + 1, totalDuration, lastError);
+        
+        // 发送失败告警
+        if (jobAlertService != null) {
+            try {
+                jobAlertService.sendAlert(job, lastError, totalDuration);
+            } catch (Exception e) {
+                log.error("[ts-job] Failed to send alert for job [{}]: {}", job.getKey(), e.getMessage());
+            }
+        }
+        
         return ExecuteResult.failure(lastError);
+    }
+    
+    /**
+     * 检查慢任务告警
+     */
+    private void checkSlowAlert(JobDTO job, long duration) {
+        if (job.getSlowThreshold() > 0 && duration > job.getSlowThreshold() * 1000) {
+            log.warn("[ts-job] Job [{}] slow execution: {}ms exceeds threshold {}s", 
+                    job.getKey(), duration, job.getSlowThreshold());
+            if (jobAlertService != null) {
+                try {
+                    jobAlertService.sendSlowAlert(job, duration);
+                } catch (Exception e) {
+                    log.error("[ts-job] Failed to send slow alert for job [{}]: {}", job.getKey(), e.getMessage());
+                }
+            }
+        }
     }
 
     /**
-     * 带超时执行任务
+     * 带超时执行任务（详细版）
      */
+    private ExecuteResult executeWithTimeoutDetailed(JobDTO job, int timeoutSeconds) {
+        Future<Boolean> future = taskExecutor.submit(() -> executeJob(job));
+        try {
+            Boolean result = future.get(timeoutSeconds, TimeUnit.SECONDS);
+            if (result) {
+                return ExecuteResult.success();
+            } else {
+                return ExecuteResult.failure("Task returned false");
+            }
+        } catch (TimeoutException e) {
+            log.error("[ts-job] Job [{}] timeout after {}s", job.getKey(), timeoutSeconds);
+            future.cancel(true);
+            
+            // 发送超时告警
+            if (jobAlertService != null) {
+                try {
+                    jobAlertService.sendTimeoutAlert(job, timeoutSeconds * 1000L);
+                } catch (Exception ex) {
+                    log.error("[ts-job] Failed to send timeout alert: {}", ex.getMessage());
+                }
+            }
+            
+            return ExecuteResult.failure("Timeout after " + timeoutSeconds + "s");
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.error("[ts-job] Job [{}] interrupted", job.getKey());
+            future.cancel(true);
+            return ExecuteResult.failure("Interrupted");
+        } catch (ExecutionException e) {
+            log.error("[ts-job] Job [{}] execution exception: {}", job.getKey(), e.getMessage());
+            return ExecuteResult.failure("Execution error: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 执行单个任务（详细版）
+     */
+    private ExecuteResult executeJobDetailed(JobDTO job) {
+        long startTime = System.currentTimeMillis();
+        try {
+            Object service = TsJobSpringUtils.getBean(job.getClassName());
+            if (service == null) {
+                log.error("[ts-job] Job [{}] bean not found: {}", job.getKey(), job.getClassName());
+                return ExecuteResult.failure("Bean not found: " + job.getClassName());
+            }
+            
+            Method method = ReflectionUtils.findMethod(service.getClass(), job.getaMethod().getName());
+            if (method == null) {
+                log.error("[ts-job] Job [{}] method not found: {}.{}", 
+                        job.getKey(), job.getClassName(), job.getaMethod().getName());
+                return ExecuteResult.failure("Method not found: " + job.getaMethod().getName());
+            }
+            ReflectionUtils.makeAccessible(method);
+            ReflectionUtils.invokeMethod(method, service);
+            
+            long duration = System.currentTimeMillis() - startTime;
+            return ExecuteResult.success();
+        } catch (Exception e) {
+            long duration = System.currentTimeMillis() - startTime;
+            log.error("[ts-job] Job [{}] execution failed after {}ms: {}", 
+                    job.getKey(), duration, e.getMessage(), e);
+            return ExecuteResult.failure(e.getMessage());
+        }
+    }
+    
+    /**
+     * 保留兼容性的旧方法
+     * @deprecated 请使用 {@link #executeWithTimeoutDetailed(JobDTO, int)}
+     */
+    @Deprecated
     private boolean executeWithTimeout(JobDTO job, int timeoutSeconds) {
         Future<?> future = taskExecutor.submit(() -> executeJob(job));
         try {
-            return future.get(timeoutSeconds, TimeUnit.SECONDS);
+            return (boolean) future.get(timeoutSeconds, TimeUnit.SECONDS);
         } catch (TimeoutException e) {
             log.error("[ts-job] Job [{}] timeout after {}s", job.getKey(), timeoutSeconds);
             future.cancel(true);
             return false;
         } catch (Exception e) {
             log.error("[ts-job] Job [{}] execution error: {}", job.getKey(), e.getMessage());
-            return false;
-        }
-    }
-
-    /**
-     * 执行单个任务
-     */
-    private boolean executeJob(JobDTO job) {
-        long startTime = System.currentTimeMillis();
-        try {
-            Object service = TsJobSpringUtils.getBean(job.getClassName());
-            Method method = ReflectionUtils.findMethod(service.getClass(), job.getaMethod().getName());
-            if (method == null) {
-                log.error("[ts-job] Method not found: {}.{}", job.getClassName(), job.getaMethod().getName());
-                return false;
-            }
-            ReflectionUtils.makeAccessible(method);
-            ReflectionUtils.invokeMethod(method, service);
-            
-            long duration = System.currentTimeMillis() - startTime;
-            if (duration > job.getSlowThreshold() * 1000 && job.getSlowThreshold() > 0) {
-                log.warn("[ts-job] Job [{}] slow execution detected: {}ms", job.getKey(), duration);
-                if (jobAlertService != null) {
-                    jobAlertService.sendSlowAlert(job, duration);
-                }
-            }
-            return true;
-        } catch (Exception e) {
-            log.error("[ts-job] Job [{}] execution failed: {}", job.getKey(), e.getMessage(), e);
             return false;
         }
     }

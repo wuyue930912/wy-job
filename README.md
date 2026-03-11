@@ -218,6 +218,33 @@ public void execute() {
 
 ## 更新记录
 
+### 2026-03-11 (第三版)
+- **配置优化**
+  - 新增告警配置（Alert）类，支持Webhook、企业微信告警
+  - 新增调度配置（Scheduler）类，支持默认超时、重试、并发等配置
+- **代码优化**
+  - TaskService 增加详细的执行日志和异常处理
+  - 新增 `executeWithTimeoutDetailed` 和 `executeJobDetailed` 方法，提供更详细的执行结果
+  - 优化重试机制，增加每次尝试的详细日志
+  - 添加任务超时告警触发逻辑
+  - 完善异常捕获，避免告警发送失败影响主流程
+- **API增强**
+  - 新增 `/ts-job/get-today-stats` - 获取今日执行统计
+  - 新增 `/ts-job/get-recent-failed` - 获取近期失败记录
+  - 新增 `/ts-job/get-slow-records` - 获取慢任务记录
+  - 新增 `/ts-job/get-job-detail-stats` - 获取任务详细统计
+- **DAO层扩展**
+  - 新增 `selectTodayRecords` - 查询今日执行记录
+  - 新增 `selectRecentFailedRecords` - 查询近期失败记录
+  - 新增 `selectTodayRecordBI` - 统计今日各状态执行数量
+  - 新增 `selectSlowRecords` - 查询慢任务记录
+  - 新增 `selectTopJobExecutions` - 统计执行次数Top任务
+  - 新增 `selectJobStatsByTimeRange` - 获取时间范围内统计
+- **日志完善**
+  - 增加任务执行各阶段的详细日志
+  - 添加任务启动、执行、成功、失败、耗时等关键节点日志
+  - 优化异常日志输出格式
+
 ### 2026-03-11 (第二版)
 - 新增任务暂停/恢复功能（TaskSuspendService）
   - `GET /ts-job/suspend-job?jobKey=xxx` - 暂停任务

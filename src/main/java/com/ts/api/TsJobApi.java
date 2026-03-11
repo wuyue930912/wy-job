@@ -506,4 +506,126 @@ public class TsJobApi {
             return new TsJobResponseVO<>(500L, "处理失败: " + e.getMessage());
         }
     }
+    
+    /**
+     * 获取今日执行统计
+     */
+    @GetMapping("/get-today-stats")
+    public TsJobResponseVO<Map<String, Object>> getTodayStats() {
+        try {
+            Map<String, Object> stats = new HashMap<>();
+            
+            // 今日各状态统计
+            List<JobRecordBI> statusBI = tsJobRecordDAO.selectTodayRecordBI();
+            stats.put("statusStats", statusBI);
+            
+            // 今日执行次数Top任务
+            List<JobRecordBI> topJobs = tsJobRecordDAO.selectTopJobExecutions(10);
+            stats.put("topJobs", topJobs);
+            
+            // 今日总执行次数
+            long totalToday = statusBI.stream().mapToLong(JobRecordBI::getValue).sum();
+            stats.put("totalExecutions", totalToday);
+            
+            // 计算成功率
+            long successCount = statusBI.stream()
+                    .filter(bi -> "1".equals(bi.getName()))
+                    .mapToLong(JobRecordBI::getValue)
+                    .sum();
+            double successRate = totalToday > 0 ? (double) successCount / totalToday * 100 : 0;
+            stats.put("successRate", successRate);
+            
+            return new TsJobResponseVO<>(200L, "处理成功", stats);
+        } catch (Exception e) {
+            log.error("[ts-job-TsJobApi] get today stats error: {}", e.getMessage(), e);
+            return new TsJobResponseVO<>(500L, "处理失败: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * 获取近期失败记录
+     */
+    @GetMapping("/get-recent-failed")
+    public TsJobResponseVO<List<TsJobRecordPO>> getRecentFailed(
+            @RequestParam(required = false, defaultValue = "24") int hours) {
+        try {
+            List<TsJobRecordPO> records = tsJobRecordDAO.selectRecentFailedRecords(hours);
+            return new TsJobResponseVO<>(200L, "处理成功", records);
+        } catch (Exception e) {
+            log.error("[ts-job-TsJobApi] get recent failed records error: {}", e.getMessage(), e);
+            return new TsJobResponseVO<>(500L, "处理失败: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * 获取慢任务记录
+     */
+    @GetMapping("/get-slow-records")
+    public TsJobResponseVO<List<TsJobRecordPO>> getSlowRecords(
+            @RequestParam(required = false, defaultValue = "30") int thresholdSeconds,
+            @RequestParam(required = false, defaultValue = "20") int limit) {
+        try {
+            List<TsJobRecordPO> records = tsJobRecordDAO.selectSlowRecords(thresholdSeconds, limit);
+            return new TsJobResponseVO<>(200L, "处理成功", records);
+        } catch (Exception e) {
+            log.error("[ts-job-TsJobApi] get slow records error: {}", e.getMessage(), e);
+            return new TsJobResponseVO<>(500L, "处理失败: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * 获取任务详细统计信息
+     */
+    @GetMapping("/get-job-detail-stats")
+    public TsJobResponseVO<Map<String, Object>> getJobDetailStats(@RequestParam String jobKey) {
+        try {
+            Map<String, Object> stats = new HashMap<>();
+            
+            // 数据库统计
+            TsJobRecordDAO.JobStats dbStats = tsJobRecordDAO.selectJobStats(jobKey);
+            if (dbStats != null) {
+                stats.put("totalCount", dbStats.getTotalCount() != null ? dbStats.getTotalCount() : 0);
+                stats.put("successCount", dbStats.getSuccessCount() != null ? dbStats.getSuccessCount() : 0);
+                stats.put("failCount", dbStats.getFailCount() != null ? dbStats.getFailCount() : 0);
+                stats.put("avgDuration", dbStats.getAvgDuration() != null ? dbStats.getAvgDuration() : 0);
+                double rate = dbStats.getTotalCount() != null && dbStats.getTotalCount() > 0 
+                        ? (double) dbStats.getSuccessCount() / dbStats.getTotalCount() * 100 : 0;
+                stats.put("successRate", rate);
+            } else {
+                stats.put("totalCount", 0);
+                stats.put("successCount", 0);
+                stats.put("failCount", 0);
+                stats.put("avgDuration", 0);
+                stats.put("successRate", 0.0);
+            }
+            
+            // 内存统计（实时数据）
+            TaskService.JobExecutionStats memStats = taskService.getJobStats(jobKey);
+            if (memStats != null) {
+                stats.put("inMemoryTotal", memStats.getTotalExecutions());
+                stats.put("inMemorySuccess", memStats.getSuccessCount());
+                stats.put("inMemoryFail", memStats.getFailureCount());
+                stats.put("inMemoryAvgDuration", memStats.getAvgDuration());
+                stats.put("inMemoryMaxDuration", memStats.getMaxDuration());
+                stats.put("inMemoryMinDuration", memStats.getMinDuration() == Long.MAX_VALUE ? 0 : memStats.getMinDuration());
+                stats.put("lastExecutionTime", memStats.getLastExecutionTime());
+            }
+            
+            // 最近执行状态
+            TsJobRecordPO lastRecord = tsJobRecordDAO.selectLastByJobKey(jobKey);
+            if (lastRecord != null) {
+                stats.put("lastStatus", lastRecord.getRecordStatus());
+                stats.put("lastExecutionTime", lastRecord.getRecordTime());
+            }
+            
+            // 运行状态
+            stats.put("isRunning", taskService.getRunningJobCount(jobKey) > 0);
+            stats.put("runningCount", taskService.getRunningJobCount(jobKey));
+            
+            return new TsJobResponseVO<>(200L, "处理成功", stats);
+        } catch (Exception e) {
+            log.error("[ts-job-TsJobApi] get job detail stats error: {}", e.getMessage(), e);
+            return new TsJobResponseVO<>(500L, "处理失败: " + e.getMessage());
+        }
+    }
 }
