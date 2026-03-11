@@ -76,16 +76,22 @@ public class TsJobConfig {
             List<Method> methodList = Arrays.asList(aClass.getMethods());
             methodList.forEach(aMethod -> {
                 if (aMethod.getAnnotation(TsJOB.class) != null) {
+                    TsJOB annotation = aMethod.getAnnotation(TsJOB.class);
                     JobDTO dto = new JobDTO();
                     dto.setaClass(aClass);
                     String[] classNameSplit = aClass.getName().split("\\.");
                     String className = classNameSplit[classNameSplit.length - 1];
                     dto.setClassName(lowerFirst(className));
                     dto.setaMethod(aMethod);
-                    dto.setKey(aMethod.getAnnotation(TsJOB.class).key());
-                    log.info("[ts-job-TsJobConfig] class [{}] method [{}] key [{}]", className, aMethod, aMethod.getAnnotation(TsJOB.class).key());
+                    dto.setKey(annotation.key());
+                    dto.setDescription(annotation.description());
+                    dto.setRetryCount(annotation.retryCount());
+                    dto.setTimeout(annotation.timeout());
+                    dto.setRetryInterval(annotation.retryInterval());
+                    log.info("[ts-job-TsJobConfig] class [{}] method [{}] key [{}], retryCount [{}], timeout [{}]s", 
+                            className, aMethod, annotation.key(), annotation.retryCount(), annotation.timeout());
 
-                    jobs.put(aMethod.getAnnotation(TsJOB.class).key(), dto);
+                    jobs.put(annotation.key(), dto);
                 }
             });
         });
