@@ -63,9 +63,25 @@ public class TaskService {
      * 任务告警服务（可选）
      */
     private JobAlertService jobAlertService;
+    
+    /**
+     * 失败策略服务（可选）
+     */
+    private FailStrategyService failStrategyService;
+    
+    /**
+     * 获取所有任务的Map引用（供其他服务使用）
+     */
+    public static Map<String, JobDTO> allJobs() {
+        return TsJobConfig.jobs;
+    }
 
     public void setJobAlertService(JobAlertService alertService) {
         this.jobAlertService = alertService;
+    }
+    
+    public void setFailStrategyService(FailStrategyService failStrategyService) {
+        this.failStrategyService = failStrategyService;
     }
 
     public void runTaskByQuartzKey(JobKey key) {
@@ -313,6 +329,15 @@ public class TaskService {
                 jobAlertService.sendAlert(job, lastError, totalDuration);
             } catch (Exception e) {
                 log.error("[ts-job] Failed to send alert for job [{}]: {}", job.getKey(), e.getMessage());
+            }
+        }
+        
+        // 处理失败策略
+        if (failStrategyService != null) {
+            try {
+                failStrategyService.handleJobFailure(job, lastError);
+            } catch (Exception e) {
+                log.error("[ts-job] Failed to handle failure strategy for job [{}]: {}", job.getKey(), e.getMessage());
             }
         }
         

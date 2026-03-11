@@ -10,8 +10,10 @@ import com.ts.mapper.TsJobRecordDAO;
 import com.ts.po.TsJobPO;
 import com.ts.po.TsJobRecordPO;
 import com.ts.service.SchedulerHealthService;
+import com.ts.service.TaskGroupService;
 import com.ts.service.TaskService;
 import com.ts.service.TaskSuspendService;
+import com.ts.service.FailStrategyService;
 import com.ts.util.TsJobSpringUtils;
 import com.ts.vo.TsJobPageParamVO;
 import com.ts.vo.TsJobPageResultVO;
@@ -57,6 +59,10 @@ public class TsJobApi {
     private final TaskSuspendService taskSuspendService;
 
     private final SchedulerHealthService schedulerHealthService;
+    
+    private final TaskGroupService taskGroupService;
+    
+    private final FailStrategyService failStrategyService;
 
     /**
      * 根据KEY执行JOB对应的方法
@@ -625,6 +631,139 @@ public class TsJobApi {
             return new TsJobResponseVO<>(200L, "处理成功", stats);
         } catch (Exception e) {
             log.error("[ts-job-TsJobApi] get job detail stats error: {}", e.getMessage(), e);
+            return new TsJobResponseVO<>(500L, "处理失败: " + e.getMessage());
+        }
+    }
+    
+    // ==================== 任务分组和标签 API ====================
+    
+    /**
+     * 获取所有任务分组
+     */
+    @GetMapping("/get-job-groups")
+    public TsJobResponseVO<List<String>> getJobGroups() {
+        try {
+            List<String> groups = taskGroupService.getAllJobGroups();
+            return new TsJobResponseVO<>(200L, "处理成功", groups);
+        } catch (Exception e) {
+            log.error("[ts-job-TsJobApi] get job groups error: {}", e.getMessage(), e);
+            return new TsJobResponseVO<>(500L, "处理失败: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * 获取所有任务标签
+     */
+    @GetMapping("/get-job-tags")
+    public TsJobResponseVO<List<String>> getJobTags() {
+        try {
+            List<String> tags = taskGroupService.getAllTags();
+            return new TsJobResponseVO<>(200L, "处理成功", tags);
+        } catch (Exception e) {
+            log.error("[ts-job-TsJobApi] get job tags error: {}", e.getMessage(), e);
+            return new TsJobResponseVO<>(500L, "处理失败: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * 根据分组获取任务列表
+     */
+    @GetMapping("/get-jobs-by-group")
+    public TsJobResponseVO<List<JobDTO>> getJobsByGroup(String group) {
+        try {
+            List<JobDTO> jobs = taskGroupService.getJobsByGroup(group);
+            return new TsJobResponseVO<>(200L, "处理成功", jobs);
+        } catch (Exception e) {
+            log.error("[ts-job-TsJobApi] get jobs by group error: {}", e.getMessage(), e);
+            return new TsJobResponseVO<>(500L, "处理失败: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * 根据标签获取任务列表
+     */
+    @GetMapping("/get-jobs-by-tag")
+    public TsJobResponseVO<List<JobDTO>> getJobsByTag(String tag) {
+        try {
+            List<JobDTO> jobs = taskGroupService.getJobsByTag(tag);
+            return new TsJobResponseVO<>(200L, "处理成功", jobs);
+        } catch (Exception e) {
+            log.error("[ts-job-TsJobApi] get jobs by tag error: {}", e.getMessage(), e);
+            return new TsJobResponseVO<>(500L, "处理失败: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * 获取分组统计信息
+     */
+    @GetMapping("/get-group-stats")
+    public TsJobResponseVO<Map<String, Long>> getGroupStats() {
+        try {
+            Map<String, Long> stats = taskGroupService.getGroupStats();
+            return new TsJobResponseVO<>(200L, "处理成功", stats);
+        } catch (Exception e) {
+            log.error("[ts-job-TsJobApi] get group stats error: {}", e.getMessage(), e);
+            return new TsJobResponseVO<>(500L, "处理失败: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * 获取标签统计信息
+     */
+    @GetMapping("/get-tag-stats")
+    public TsJobResponseVO<Map<String, Long>> getTagStats() {
+        try {
+            Map<String, Long> stats = taskGroupService.getTagStats();
+            return new TsJobResponseVO<>(200L, "处理成功", stats);
+        } catch (Exception e) {
+            log.error("[ts-job-TsJobApi] get tag stats error: {}", e.getMessage(), e);
+            return new TsJobResponseVO<>(500L, "处理失败: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * 获取分组树结构
+     */
+    @GetMapping("/get-group-tree")
+    public TsJobResponseVO<List<Map<String, Object>>> getGroupTree() {
+        try {
+            List<Map<String, Object>> tree = taskGroupService.getGroupTree();
+            return new TsJobResponseVO<>(200L, "处理成功", tree);
+        } catch (Exception e) {
+            log.error("[ts-job-TsJobApi] get group tree error: {}", e.getMessage(), e);
+            return new TsJobResponseVO<>(500L, "处理失败: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * 获取失败策略列表（前端下拉框用）
+     */
+    @GetMapping("/get-fail-strategies")
+    public TsJobResponseVO<List<Map<String, Object>>> getFailStrategies() {
+        try {
+            List<Map<String, Object>> strategies = new ArrayList<>();
+            
+            Map<String, Object> s1 = new HashMap<>();
+            s1.put("value", 1);
+            s1.put("label", "停止调度");
+            s1.put("desc", "任务失败后自动暂停调度");
+            strategies.add(s1);
+            
+            Map<String, Object> s2 = new HashMap<>();
+            s2.put("value", 2);
+            s2.put("label", "继续重试");
+            s2.put("desc", "任务失败后按重试配置继续执行（默认）");
+            strategies.add(s2);
+            
+            Map<String, Object> s3 = new HashMap<>();
+            s3.put("value", 3);
+            s3.put("label", "忽略继续");
+            s3.put("desc", "任务失败后记录日志但继续执行后续调度");
+            strategies.add(s3);
+            
+            return new TsJobResponseVO<>(200L, "处理成功", strategies);
+        } catch (Exception e) {
+            log.error("[ts-job-TsJobApi] get fail strategies error: {}", e.getMessage(), e);
             return new TsJobResponseVO<>(500L, "处理失败: " + e.getMessage());
         }
     }

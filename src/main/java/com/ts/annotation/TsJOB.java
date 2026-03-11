@@ -59,4 +59,24 @@ public @interface TsJOB {
      * 任务执行超过此时间则触发告警
      */
     int slowThreshold() default 0;
+    
+    // ==================== 新增配置：任务分组 ====================
+    
+    /**
+     * 任务分组（用于任务分类管理）
+     */
+    String jobGroup() default "";
+    
+    /**
+     * 任务标签（多个用逗号分隔，如: "important,daily"）
+     */
+    String tags() default "";
+    
+    // ==================== 新增配置：失败策略 ====================
+    
+    /**
+     * 失败策略：1-停止调度 2-继续重试 3-忽略继续
+     * 默认：2（继续重试）
+     */
+    int failStrategy() default 2;
 }

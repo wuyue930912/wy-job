@@ -89,6 +89,25 @@ public class JobDTO {
      * 启用执行统计
      */
     private boolean enableStats = true;
+    
+    // ==================== 新增配置：任务分组 ====================
+    
+    /**
+     * 任务分组
+     */
+    private String jobGroup;
+    
+    /**
+     * 任务标签（多个用逗号分隔）
+     */
+    private String tags;
+    
+    // ==================== 新增配置：失败策略 ====================
+    
+    /**
+     * 失败策略：1-停止调度 2-继续重试 3-忽略继续（默认继续重试）
+     */
+    private int failStrategy = 2;
 
     @Override
     public String toString() {
@@ -101,6 +120,9 @@ public class JobDTO {
                 ", maxConcurrent=" + maxConcurrent +
                 ", dependencies=" + dependencies +
                 ", slowThreshold=" + slowThreshold +
+                ", jobGroup='" + jobGroup + '\'' +
+                ", tags='" + tags + '\'' +
+                ", failStrategy=" + failStrategy +
                 '}';
     }
 }

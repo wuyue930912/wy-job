@@ -102,11 +102,23 @@ public class TsJobConfig {
                     // 新增：慢查询阈值
                     dto.setSlowThreshold(annotation.slowThreshold());
                     
-                    log.info("[ts-job-TsJobConfig] class [{}] method [{}] key [{}], retryCount [{}], timeout [{}]s, maxConcurrent [{}], dependencies [{}], slowThreshold [{}]s", 
+                    // 新增：任务分组
+                    dto.setJobGroup(annotation.jobGroup());
+                    
+                    // 新增：任务标签
+                    dto.setTags(annotation.tags());
+                    
+                    // 新增：失败策略
+                    dto.setFailStrategy(annotation.failStrategy());
+                    
+                    log.info("[ts-job-TsJobConfig] class [{}] method [{}] key [{}], retryCount [{}], timeout [{}]s, maxConcurrent [{}], dependencies [{}], slowThreshold [{}]s, jobGroup [{}], tags [{}], failStrategy [{}]", 
                             className, aMethod, annotation.key(), annotation.retryCount(), 
                             annotation.timeout(), annotation.maxConcurrent(),
                             Arrays.toString(annotation.dependencies()),
-                            annotation.slowThreshold());
+                            annotation.slowThreshold(),
+                            annotation.jobGroup(),
+                            annotation.tags(),
+                            annotation.failStrategy());
 
                     jobs.put(annotation.key(), dto);
                 }
